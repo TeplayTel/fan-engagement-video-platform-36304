@@ -151,6 +151,34 @@ echo ""
 echo "Environment variables saved to db_visualizer/postgres.env"
 echo "To use with Node.js viewer, run: source db_visualizer/postgres.env"
 
+# Apply SQL migrations if present
+MIGRATIONS_DIR="migrations"
+if [ -d "${MIGRATIONS_DIR}" ]; then
+    echo ""
+    echo "Applying database migrations from ${MIGRATIONS_DIR}..."
+    MIGRATION_COUNT=0
+    # Find and apply .sql files in lexical order for deterministic execution
+    for sql_file in $(ls -1 ${MIGRATIONS_DIR}/*.sql 2>/dev/null | sort); do
+        if [ -f "${sql_file}" ]; then
+            echo " - Applying: ${sql_file}"
+            sudo -u postgres ${PG_BIN}/psql -p ${DB_PORT} -d ${DB_NAME} -f "${sql_file}" || {
+                echo "Migration failed: ${sql_file}"
+                exit 1
+            }
+            MIGRATION_COUNT=$((MIGRATION_COUNT + 1))
+        fi
+    done
+    if [ "${MIGRATION_COUNT}" -eq 0 ]; then
+        echo "No .sql migration files found in ${MIGRATIONS_DIR}."
+    else
+        echo "Applied ${MIGRATION_COUNT} migration(s)."
+    fi
+else
+    echo ""
+    echo "No migrations directory found at ${MIGRATIONS_DIR}. Skipping migration step."
+fi
+
+echo ""
 echo "To connect to the database, use one of the following commands:"
 echo "psql -h localhost -U ${DB_USER} -d ${DB_NAME} -p ${DB_PORT}"
 echo "$(cat db_connection.txt)"
